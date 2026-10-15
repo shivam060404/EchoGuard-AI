@@ -61,7 +61,7 @@ def main() -> None:
     from pymongo import MongoClient
 
     uri = os.getenv("MONGO_URI", "mongodb://mongo:27017")
-    with MongoClient(uri, serverSelectionTimeoutMS=5000) as client:
+    with MongoClient(uri, serverSelectionTimeoutMS=5000, tz_aware=True) as client:
         counts = seed(client.echoguard, load_sources())
     print(json.dumps({"status": "seeded", **counts}, sort_keys=True))
 

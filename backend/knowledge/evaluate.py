@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.knowledge.retriever import MongoHybridRetriever
+from backend.knowledge.model import active_at
 
 
 CASES_PATH = Path(__file__).with_name("eval_cases.json")
@@ -38,10 +39,7 @@ def evaluate(database, as_of: datetime) -> dict:
         for item in results:
             document_key = f"{case['tenant_id']}:{item.document_id}:{item.version}"
             document = database.knowledge_documents.find_one({"_id": document_key})
-            if (not document or document["status"] != "approved"
-                    or document["effective_from"] > as_of
-                    or (document["effective_until"] is not None
-                        and document["effective_until"] <= as_of)
+            if (not document or not active_at(document, as_of)
                     or item.chunk_id not in document["chunk_ids"]):
                 raise AssertionError("Citation does not resolve to an active approved version")
             checked_citations += 1
@@ -67,7 +65,7 @@ def main() -> None:
     from pymongo import MongoClient
 
     uri = os.getenv("MONGO_URI", "mongodb://mongo:27017")
-    with MongoClient(uri, serverSelectionTimeoutMS=5000) as client:
+    with MongoClient(uri, serverSelectionTimeoutMS=5000, tz_aware=True) as client:
         report = evaluate(client.echoguard, datetime.now(timezone.utc))
     print(json.dumps(report, sort_keys=True))
 

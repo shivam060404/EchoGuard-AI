@@ -16,6 +16,17 @@ def utc(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def active_at(document: dict, as_of: datetime) -> bool:
+    """Handle both PyMongo's default naive UTC and tz-aware BSON decoding."""
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must have a timezone")
+    def aware(value):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return (document["status"] == "approved"
+            and aware(document["effective_from"]) <= as_of
+            and (document["effective_until"] is None or aware(document["effective_until"]) > as_of))
+
+
 def build_document(source: dict) -> tuple[dict, list[dict]]:
     required = {"document_id", "version", "tenant_id", "product", "title", "source",
                 "status", "effective_from", "effective_until", "error_codes", "sections"}

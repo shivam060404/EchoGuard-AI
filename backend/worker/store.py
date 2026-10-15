@@ -14,6 +14,8 @@ class CaseStore:
     def ensure_indexes(self) -> None:
         self.db.cases.create_index([("tenant_id", 1), ("event_id", 1)], unique=True)
         self.db.cases.create_index([("tenant_id", 1), ("event_time", -1)])
+        self.db.cases.create_index([("tenant_id", 1), ("product", 1), ("error_code", 1), ("event_time", 1)])
+        self.db.incidents.create_index([("tenant_id", 1), ("_id", 1)])
         self.db.signals.create_index([("tenant_id", 1), ("cluster_id", 1)])
         self.db.clusters.create_index([("tenant_id", 1), ("status", 1), ("last_seen", -1)])
         self.db.incidents.create_index([("tenant_id", 1), ("status", 1), ("last_seen", -1)])

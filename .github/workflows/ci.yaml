@@ -1,4 +1,4 @@
-name: Phase 0 checks
+name: EchoGuard checks
 on:
   push:
   pull_request:
@@ -22,8 +22,9 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose --profile demo config --quiet
       - run: docker compose --profile stream config --quiet
+      - run: docker compose --profile worker --profile knowledge --profile workflow config --quiet
       - run: docker compose build api web
-      - run: sh -n infra/kafka/init_topics.sh && sh -n backend/ingest/demo.sh && sh -n backend/stream/demo.sh && sh -n backend/worker/demo.sh && sh -n backend/knowledge/demo.sh && sh -n infra/smoke.sh
+      - run: sh -n infra/kafka/init_topics.sh && sh -n backend/ingest/demo.sh && sh -n backend/stream/demo.sh && sh -n backend/worker/demo.sh && sh -n backend/knowledge/demo.sh && sh -n backend/workflow/demo.sh && sh -n infra/smoke.sh
       - run: npm ci
         working-directory: frontend
       - run: npm run typecheck
@@ -100,3 +101,28 @@ jobs:
       - if: always()
         run: docker compose --profile knowledge down -v
 
+  phase5-workflow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: backend/workflow/demo.sh
+      - if: failure()
+        run: docker compose logs mongo
+      - if: always()
+        run: docker compose --profile workflow down -v
+
+  phase6-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: bash backend/api/demo.sh
+      - if: failure()
+        run: docker compose logs --tail=100 api web case-writer stream-job
+      - if: always()
+        run: docker compose --profile worker --profile stream --profile knowledge --profile demo down -v

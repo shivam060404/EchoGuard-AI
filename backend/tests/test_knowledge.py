@@ -58,3 +58,16 @@ def test_seed_rejects_duplicate_sections_and_bad_effective_range() -> None:
     bad_time = {**source, "effective_until": "2025-01-01T00:00:00Z"}
     with pytest.raises(ValueError, match="effective interval"):
         build_document(bad_time)
+
+
+def test_effective_dates_accept_bson_naive_utc_and_exclude_expiry_boundary():
+    from datetime import datetime, timezone, timedelta
+    from backend.knowledge.model import active_at
+    at = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    document = {"status": "approved", "effective_from": at.replace(tzinfo=None),
+                "effective_until": (at + timedelta(days=1)).replace(tzinfo=None)}
+    assert active_at(document, at)
+    assert not active_at(document, at + timedelta(days=1))
+    assert not active_at({**document, "status": "revoked"}, at)
+    with pytest.raises(ValueError):
+        active_at(document, at.replace(tzinfo=None))

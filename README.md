@@ -2,17 +2,18 @@
 
 EchoGuard AI is a project for detecting support incidents from live customer messages, investigating them with evidence, and sending proposed actions through human approval.
 
-**Current state:** Kafka ingestion, Spark candidate detection, and MongoDB case correlation passed local live demos. Phase 4 approved knowledge retrieval is ready for its MongoDB integration run. AI workflows and incident review are later phases. The [implementation plan](docs/IMPLEMENTATION_PLAN.md) describes the full path.
+**Current state:** Kafka, Spark, MongoDB correlation, approved retrieval, and the LangGraph checkpoint/review workflow have passed local live gates. The authenticated Next.js review console and simulated action/outcome loop are implemented; their live gate is pending. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) and [console guide](backend/api/README.md).
 
 ## What works today
 
-- A Next.js dashboard displays API, Kafka, and MongoDB health.
+- A Next.js console displays incident evidence, cited plans, review decisions, simulated actions, and complaint trends.
 - A FastAPI service exposes liveness and readiness endpoints.
 - A seeded generator creates synthetic support messages, including payment and login spikes, duplicates, late events, and malformed records.
 - A Kafka producer validates and publishes records. A verifier reads them back and checks each delivered record.
 - Versioned JSON schemas and backend tests check the event contracts.
 - An opt-in case writer stores unique cases and correlates candidate signals into MongoDB clusters and incidents.
 - An isolated knowledge tool loads approved synthetic runbooks and evaluates tenant-scoped hybrid retrieval.
+- A LangGraph workflow validates cited proposals, persists checkpoints, and waits for a reviewer decision with stale-proposal and tenant checks.
 
 The default stack starts an idle Spark runtime. The streaming job runs through an opt-in Compose profile.
 
@@ -23,6 +24,16 @@ The default stack starts an idle Spark runtime. The streaming job runs through a
 - Node.js 20.9 or newer only if you want to run the frontend outside Docker.
 
 Run the commands below from the repository root.
+
+## Run the review console
+
+With the backend virtual environment installed as below and Docker running:
+
+```sh
+bash backend/api/demo.sh
+```
+
+This runs the data pipeline, seeds knowledge, starts API/web, and verifies the session/approval/action loop. Open http://localhost:3000 and sign in using the reviewer token in the ignored `data/local-auth.json` file. Actions are simulated. See the [console guide](backend/api/README.md) for credential rotation, custom ports, endpoints, and recovery.
 
 ## Run the end-to-end ingestion demo
 
@@ -74,6 +85,14 @@ backend/knowledge/demo.sh
 
 See the [knowledge guide](backend/knowledge/README.md) and [Phase 4 status](docs/PHASE_4_STATUS.md). Its vector is a small offline domain-feature baseline, so the evaluation applies to the seeded synthetic queries.
 
+To verify Phase 5 checkpoint persistence and human review:
+
+~~~sh
+backend/workflow/demo.sh
+~~~
+
+This also runs the Phase 4 retrieval gate in an isolated synthetic demo database. It pauses in one container process, resumes in another, and checks concurrent and repeated approvals. The provider is a deterministic mock; no external action is executed. See the [workflow guide](backend/workflow/README.md) for reviewing actual stored incidents through the CLI.
+
 Open the dashboard at http://localhost:3000. The API is at http://localhost:8000, with these endpoints:
 
 | Endpoint | Meaning |
@@ -98,6 +117,7 @@ docker compose --profile demo config --quiet
 docker compose --profile stream config --quiet
 docker compose --profile worker config --quiet
 docker compose --profile knowledge config --quiet
+docker compose --profile workflow config --quiet
 ~~~
 
 For frontend checks:
@@ -135,6 +155,7 @@ To delete local Kafka and MongoDB volumes, run docker compose down -v. This remo
 | [backend/stream](backend/stream) | Spark normalization and candidate detection. |
 | [backend/worker](backend/worker) | Kafka case writer, MongoDB projection, and deterministic correlation. |
 | [backend/knowledge](backend/knowledge) | Approved runbooks, document versions, hybrid retrieval, and evaluation. |
+| [backend/workflow](backend/workflow) | LangGraph stages, provider interface, review service, MongoDB checkpoints, and CLI. |
 | [backend/tests](backend/tests) | Backend API, contract, and ingestion tests. |
 | [frontend](frontend) | Isolated Next.js dashboard. |
 | [infra](infra) | Kafka setup, smoke check, architecture decisions, and threat model. |
@@ -145,6 +166,6 @@ Python dependencies are pinned in [backend/requirements.txt](backend/requirement
 
 ## Release status
 
-This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Case persistence has passed its local demo. Retrieval awaits its live gate; agent workflows, approvals, observability, and outcome verification remain planned.
+This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Case persistence has passed its local demo. Retrieval and the controlled workflow await live gates. Public authentication, the review console, action execution, observability, and outcome verification remain planned.
 
-The [Phase 4 status](docs/PHASE_4_STATUS.md) records the current integration gate; earlier phases are documented in the same directory.
+The [Phase 5 status](docs/PHASE_5_STATUS.md) records the current integration gates; earlier phases are documented in the same directory.

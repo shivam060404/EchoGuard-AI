@@ -13,3 +13,4 @@ data/scenarios/
 *.tsbuildinfo
 .DS_Store
 
+data/local-auth.json

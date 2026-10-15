@@ -1,6 +1,6 @@
 # EchoGuard AI — implementation plan
 
-Status: approved; Phase 1–3 seeded local demos passed on 15 October 2026; Phase 4 knowledge/retrieval awaits its live MongoDB gate; Phase 0 smoke gate remains open
+Status: approved; Phase 1–3 seeded local demos passed on 15 October 2026; Phase 4 retrieval and Phase 5 workflow live gates passed on 16 October 2026; Phase 6 console/action implementation is locally checked and awaits its live gate; Phase 0 smoke gate remains open
 
 ## 1. Goal, boundary, and first release
 

@@ -14,3 +14,5 @@ Pure knowledge tests, Python compilation, shell syntax, and Compose configuratio
 ## Live gate
 
 Run `backend/knowledge/demo.sh` in the Docker-enabled terminal. The evaluation must report `status: verified`, recall@5 of at least 0.85, and approved citations checked. The seed and evaluation are repeatable. This small synthetic baseline does not establish retrieval quality on real support data.
+
+On 16 October 2026, the citation evaluator was corrected to handle both naive UTC BSON dates and UTC-aware dates. A regression test covers expiry boundaries. The Phase 5 Docker demo also executes this retrieval gate; the user supplied its successful live result on 16 October 2026: recall@5 = 1.0 on the five synthetic queries, alongside successful Phase 5 restart and approval verification.
