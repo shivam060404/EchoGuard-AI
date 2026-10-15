@@ -23,4 +23,5 @@ create_topic support.raw.v1 3 604800000
 create_topic support.enriched.v1 3 604800000
 create_topic incident.signals.v1 3 604800000
 create_topic ingest.dlq.v1 3 1209600000
+create_topic stream.dlq.v1 3 1209600000
 

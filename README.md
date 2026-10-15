@@ -2,7 +2,7 @@
 
 EchoGuard AI is a project for detecting support incidents from live customer messages, investigating them with evidence, and sending proposed actions through human approval.
 
-**Current state:** the repository has a working foundation and a deterministic Kafka ingestion demo. It does not yet detect incidents or run AI workflows. The [implementation plan](docs/IMPLEMENTATION_PLAN.md) describes those later phases.
+**Current state:** Kafka ingestion, Spark candidate detection, and MongoDB case correlation passed local live demos. Phase 4 approved knowledge retrieval is ready for its MongoDB integration run. AI workflows and incident review are later phases. The [implementation plan](docs/IMPLEMENTATION_PLAN.md) describes the full path.
 
 ## What works today
 
@@ -11,8 +11,10 @@ EchoGuard AI is a project for detecting support incidents from live customer mes
 - A seeded generator creates synthetic support messages, including payment and login spikes, duplicates, late events, and malformed records.
 - A Kafka producer validates and publishes records. A verifier reads them back and checks each delivered record.
 - Versioned JSON schemas and backend tests check the event contracts.
+- An opt-in case writer stores unique cases and correlates candidate signals into MongoDB clusters and incidents.
+- An isolated knowledge tool loads approved synthetic runbooks and evaluates tenant-scoped hybrid retrieval.
 
-The local stack also starts Spark, but no streaming job runs yet.
+The default stack starts an idle Spark runtime. The streaming job runs through an opt-in Compose profile.
 
 ## Prerequisites
 
@@ -48,6 +50,30 @@ Run the commands below from the repository root.
 
 The demo writes its dataset, manifest, and publish receipt under data/scenarios/. With the default seed, it generates 265 records: 263 valid messages for support.raw.v1 and 2 invalid messages for ingest.dlq.v1. The verifier confirms the records for that publish run. This is an ingestion demonstration; it does not produce an incident alert yet.
 
+To run the Phase 2 Spark job and verify candidate signals, use this separate demo from a terminal with Docker socket access:
+
+~~~sh
+backend/stream/demo.sh
+~~~
+
+It starts the stream-job profile, reruns the seeded ingestion demo, and waits for PAY-502 and AUTH-401 signals plus five late records. The Phase 2 verifier runs inside the stream-job container, so it uses the Kafka client installed in that image. This live gate passed on 15 October 2026. See the [streaming guide](backend/stream/README.md) and [Phase 2 status](docs/PHASE_2_STATUS.md).
+
+To run the next phase and verify cases and incidents in MongoDB:
+
+~~~sh
+backend/worker/demo.sh
+~~~
+
+See the [case writer guide](backend/worker/README.md) and [Phase 3 status](docs/PHASE_3_STATUS.md). The worker runs in a separate opt-in Compose profile.
+
+The Phase 3 local demo passed with 250 unique cases and two incidents. To seed and evaluate the next phase's approved knowledge base:
+
+~~~sh
+backend/knowledge/demo.sh
+~~~
+
+See the [knowledge guide](backend/knowledge/README.md) and [Phase 4 status](docs/PHASE_4_STATUS.md). Its vector is a small offline domain-feature baseline, so the evaluation applies to the seeded synthetic queries.
+
 Open the dashboard at http://localhost:3000. The API is at http://localhost:8000, with these endpoints:
 
 | Endpoint | Meaning |
@@ -69,6 +95,9 @@ After activating the Python environment above:
 python -m backend.contracts.check_contracts
 python -m pytest -c backend/pyproject.toml -q
 docker compose --profile demo config --quiet
+docker compose --profile stream config --quiet
+docker compose --profile worker config --quiet
+docker compose --profile knowledge config --quiet
 ~~~
 
 For frontend checks:
@@ -103,8 +132,9 @@ To delete local Kafka and MongoDB volumes, run docker compose down -v. This remo
 | [backend/api](backend/api) | FastAPI app, validated settings, and health routes. Every router is registered in main.py. |
 | [backend/contracts](backend/contracts) | Versioned event schemas, fixtures, and validation. |
 | [backend/ingest](backend/ingest) | Synthetic data, Kafka publishing, verification, and demo script. |
-| [backend/stream](backend/stream) | Planned Spark streaming jobs. |
-| [backend/worker](backend/worker) | Planned incident, retrieval, and agent workflows. |
+| [backend/stream](backend/stream) | Spark normalization and candidate detection. |
+| [backend/worker](backend/worker) | Kafka case writer, MongoDB projection, and deterministic correlation. |
+| [backend/knowledge](backend/knowledge) | Approved runbooks, document versions, hybrid retrieval, and evaluation. |
 | [backend/tests](backend/tests) | Backend API, contract, and ingestion tests. |
 | [frontend](frontend) | Isolated Next.js dashboard. |
 | [infra](infra) | Kafka setup, smoke check, architecture decisions, and threat model. |
@@ -115,6 +145,6 @@ Python dependencies are pinned in [backend/requirements.txt](backend/requirement
 
 ## Release status
 
-This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Streaming detection, case persistence, retrieval, agent workflows, approvals, observability, and outcome verification are still planned.
+This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Case persistence has passed its local demo. Retrieval awaits its live gate; agent workflows, approvals, observability, and outcome verification remain planned.
 
-The [Phase 0 status](docs/PHASE_0_STATUS.md) and [Phase 1 status](docs/PHASE_1_STATUS.md) record completed checks and the live container gates that still need verification.
+The [Phase 4 status](docs/PHASE_4_STATUS.md) records the current integration gate; earlier phases are documented in the same directory.

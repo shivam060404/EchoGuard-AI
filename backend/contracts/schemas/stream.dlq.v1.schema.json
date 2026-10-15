@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echoguard.local/contracts/stream.dlq.v1.schema.json",
+  "title": "EchoGuard stream dead-letter event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "source_topic", "source_partition", "source_offset", "record_key_sha256", "reason_code", "payload_sha256", "failed_at", "validation_stage"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source_topic": {"type": "string", "const": "support.raw.v1"},
+    "source_partition": {"type": "integer", "minimum": 0},
+    "source_offset": {"type": "integer", "minimum": 0},
+    "record_key_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "reason_code": {"type": "string", "enum": ["invalid_json", "schema_violation", "key_mismatch", "oversize", "non_synthetic", "late_event"]},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "failed_at": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "validation_stage": {"type": "string", "const": "stream"}
+  }
+}

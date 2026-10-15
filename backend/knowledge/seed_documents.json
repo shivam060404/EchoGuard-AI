@@ -1,0 +1,65 @@
+[
+  {
+    "document_id": "payment-pay502-runbook", "version": "1.0.0", "tenant_id": "demo-tenant",
+    "product": "payments", "title": "PAY-502 charged but checkout failed",
+    "source": "runbook://payments/pay-502", "status": "approved",
+    "effective_from": "2026-01-01T00:00:00Z", "effective_until": null,
+    "error_codes": ["PAY-502"],
+    "sections": [
+      {"section_id": "identify", "heading": "Identify the payment failure", "text": "For PAY-502, compare failed checkout events with payment processor capture records. A customer may report that a card was charged or money was deducted even when the subscription renewal failed."},
+      {"section_id": "contain", "heading": "Contain duplicate charges", "text": "Do not ask the customer to retry checkout until the capture state is known. Check the processor idempotency key and stop automated retries if duplicate charges or debits are occurring."},
+      {"section_id": "respond", "heading": "Approved customer response", "text": "Acknowledge the failed payment and possible charge. Explain that the team is checking the processor record; avoid promising a refund or resolution before finance confirms the capture state."}
+    ]
+  },
+  {
+    "document_id": "auth401-runbook", "version": "1.0.0", "tenant_id": "demo-tenant",
+    "product": "identity", "title": "AUTH-401 sign-in failures",
+    "source": "runbook://identity/auth-401", "status": "approved",
+    "effective_from": "2026-01-01T00:00:00Z", "effective_until": null,
+    "error_codes": ["AUTH-401"],
+    "sections": [
+      {"section_id": "identify", "heading": "Identify authentication failures", "text": "For AUTH-401, compare rejected login attempts with identity-service error rates and session-token validation. Confirm whether users enter valid credentials but cannot sign in."},
+      {"section_id": "contain", "heading": "Contain access disruption", "text": "Check identity-provider availability, recent token-signing changes, and session expiry. Do not request passwords from customers or disable authentication controls as a workaround."}
+    ]
+  },
+  {
+    "document_id": "payment-incident-2025-11", "version": "1.0.0", "tenant_id": "demo-tenant",
+    "product": "payments", "title": "Historical processor timeout and duplicate capture",
+    "source": "incident://2025-11-payment-timeout", "status": "approved",
+    "effective_from": "2026-01-01T00:00:00Z", "effective_until": null,
+    "error_codes": ["PAY-502"],
+    "sections": [
+      {"section_id": "resolution", "heading": "Past incident resolution", "text": "A payment processor timeout caused checkout failures after a card capture. The team paused retry jobs, reconciled processor captures against invoices, and issued refunds only after finance approval."}
+    ]
+  },
+  {
+    "document_id": "unapproved-payment-shortcut", "version": "0.1.0", "tenant_id": "demo-tenant",
+    "product": "payments", "title": "Unapproved PAY-502 shortcut",
+    "source": "draft://payments/unsafe", "status": "draft",
+    "effective_from": "2026-01-01T00:00:00Z", "effective_until": null,
+    "error_codes": ["PAY-502"],
+    "sections": [
+      {"section_id": "draft", "heading": "Unsafe draft", "text": "This draft suggests automatically refunding every PAY-502 report without verifying processor captures. It is intentionally unapproved and must never be retrieved."}
+    ]
+  },
+  {
+    "document_id": "expired-payment-policy", "version": "1.0.0", "tenant_id": "demo-tenant",
+    "product": "payments", "title": "Expired payment retry policy",
+    "source": "runbook://payments/expired", "status": "approved",
+    "effective_from": "2025-01-01T00:00:00Z", "effective_until": "2026-06-01T00:00:00Z",
+    "error_codes": ["PAY-502"],
+    "sections": [
+      {"section_id": "old", "heading": "Old retry policy", "text": "This obsolete policy allowed immediate checkout retries after PAY-502. It expired before the seeded scenario and must never support a current recommendation."}
+    ]
+  },
+  {
+    "document_id": "other-tenant-payment", "version": "1.0.0", "tenant_id": "another-tenant",
+    "product": "payments", "title": "Other tenant PAY-502 procedure",
+    "source": "runbook://other-tenant/pay-502", "status": "approved",
+    "effective_from": "2026-01-01T00:00:00Z", "effective_until": null,
+    "error_codes": ["PAY-502"],
+    "sections": [
+      {"section_id": "private", "heading": "Other tenant procedure", "text": "This approved PAY-502 runbook belongs to another tenant. Tenant filters must prevent its text and citation from appearing in demo-tenant results."}
+    ]
+  }
+]

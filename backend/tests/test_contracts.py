@@ -17,7 +17,7 @@ def _validator(name: str) -> Draft202012Validator:
 
 
 def test_all_contracts_and_fixtures_are_valid() -> None:
-    assert len(validate_contracts()) == 4
+    assert len(validate_contracts()) == 5
 
 
 @pytest.mark.parametrize("mutation", [

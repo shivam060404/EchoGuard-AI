@@ -1,6 +1,6 @@
 # EchoGuard AI — implementation plan
 
-Status: approved; Phase 1 implemented, live Phase 0–1 container gates pending · 15 October 2026
+Status: approved; Phase 1–3 seeded local demos passed on 15 October 2026; Phase 4 knowledge/retrieval awaits its live MongoDB gate; Phase 0 smoke gate remains open
 
 ## 1. Goal, boundary, and first release
 
@@ -40,7 +40,7 @@ flowchart LR
 
 **Service responsibilities.** Spark performs schema validation, event-time handling, deduplication, normalization, windowed aggregates, and deterministic candidate signals. It does not call LLMs. A correlation worker links signals to canonical clusters using product area, error code, time, and semantic similarity; it merges or reopens existing incidents under explicit rules. The workflow service runs bounded LangGraph nodes: triage → investigate → retrieve → plan → validate → human review → action → verify. FastAPI owns authenticated APIs and server-sent events for the console. MongoDB stores operational records and immutable audit events. Kafka carries replayable events; MongoDB is the system of record for decisions and action status.
 
-**Retrieval deployment decision.** Use a `Retriever` interface. For local Compose, store documents in MongoDB, use its text index for exact terms, and use a local vector index with application-side reciprocal-rank fusion. For an Atlas-backed environment, use Atlas Search + Vector Search with `$rankFusion` when the cluster supports it. Record index/embedding versions and compare both paths on the same evaluation set. Native MongoDB fusion has version prerequisites, so do not make Atlas mandatory for the local demo. [MongoDB hybrid search documentation](https://www.mongodb.com/docs/search/tutorial/hybrid-search/).
+**Retrieval deployment decision.** Use a `Retriever` interface. For local Compose, store documents in MongoDB, use its text index for exact terms, and use a bounded application-side vector scan with reciprocal-rank fusion. Move to an indexed vector adapter when the approved corpus exceeds the local scan limit. For an Atlas-backed environment, use Atlas Search + Vector Search with `$rankFusion` when the cluster supports it. Record index/embedding versions and compare both paths on the same evaluation set. Native MongoDB fusion has version prerequisites, so do not make Atlas mandatory for the local demo. [MongoDB hybrid search documentation](https://www.mongodb.com/docs/search/tutorial/hybrid-search/).
 
 ## 3. Contracts and data model
 

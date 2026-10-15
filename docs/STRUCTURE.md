@@ -7,8 +7,9 @@ EchoGuard AI is a monorepo with isolated backend and frontend builds. Root files
 | `backend/api/` | FastAPI application, validated settings, HTTP route modules | All routers are registered in `api/main.py`. Routes call backend services as they are implemented. |
 | `backend/contracts/` | Versioned event schemas, validation, fixtures, contract checks | Producers and consumers may import this package; it never imports service modules. |
 | `backend/ingest/` | Synthetic scenario generation, Kafka publisher, delivery verifier, demo command | May import contracts; does not import API, stream, or worker. |
-| `backend/stream/` | Planned Spark normalization and detection jobs | Consumes raw events and emits enriched events and candidate signals; never runs LLM workflows. |
-| `backend/worker/` | Planned correlation, retrieval, agent workflow, action, and outcome workers | Consumes signals and uses explicit service/adaptor interfaces; never exposes HTTP routes. |
+| `backend/stream/` | Spark normalization and candidate detection jobs | Consumes raw events and emits enriched events and candidate signals; never runs LLM workflows. |
+| `backend/worker/` | Kafka-to-MongoDB case writer and deterministic incident correlation; later agent and action workers | Consumes signals and uses explicit service/adaptor interfaces; never exposes HTTP routes. |
+| `backend/knowledge/` | Approved document registry, chunking, local hybrid retrieval, and evaluation | Reads only approved tenant-scoped knowledge for citations; does not run agent or HTTP workflows. |
 | `backend/tests/` | Backend unit and contract tests | Configured by `backend/pyproject.toml`. |
 | `frontend/` | Next.js console | Calls the API; never imports backend Python code or reads its database directly. |
 | `infra/` | Compose support, Kafka setup, infrastructure smoke checks, ADRs, threat model | No application business logic. |
@@ -19,4 +20,4 @@ Backend dependencies are pinned in the single `backend/requirements.txt` request
 
 ## Current release boundary
 
-Only foundation and seeded ingestion are implemented. The [implementation plan](IMPLEMENTATION_PLAN.md) defines the remaining streaming, persistence, retrieval, agent, approval, console, observability, evaluation, and release gates. The local Compose configuration and synthetic data are development assets; they do not constitute a production deployment. Phase 0 and Phase 1 live container gates remain open until they pass on a Docker-enabled machine or in CI.
+Foundation, seeded ingestion, streaming, and case correlation have passed their seeded local live demos. Phase 4 knowledge retrieval awaits its MongoDB integration run. The [implementation plan](IMPLEMENTATION_PLAN.md) defines the remaining agent, approval, console, observability, evaluation, and release gates. The local Compose configuration and synthetic data are development assets; they do not constitute a production deployment. The separate Phase 0 smoke gate remains open.

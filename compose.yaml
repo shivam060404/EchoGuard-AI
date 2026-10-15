@@ -90,6 +90,59 @@ services:
       retries: 3
     restart: unless-stopped
 
+  stream-job:
+    profiles: ["stream"]
+    build:
+      context: ./backend
+      dockerfile: stream/Dockerfile
+    entrypoint: ["/opt/spark/bin/spark-submit"]
+    command:
+      - --master
+      - local[2]
+      - --conf
+      - spark.jars.ivy=/opt/echoguard/ivy
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.4
+      - /opt/echoguard/backend/stream/job.py
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      STREAM_CHECKPOINT_ROOT: /opt/echoguard/checkpoints
+      STREAM_STARTING_OFFSETS: earliest
+      SPARK_LOCAL_IP: 127.0.0.1
+    volumes:
+      - stream_checkpoints:/opt/echoguard/checkpoints
+      - stream_ivy:/opt/echoguard/ivy
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  case-writer:
+    profiles: ["worker"]
+    build:
+      context: ./backend
+      dockerfile: worker/Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      MONGO_URI: mongodb://mongo:27017
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  knowledge-tool:
+    profiles: ["knowledge"]
+    build:
+      context: ./backend
+      dockerfile: knowledge/Dockerfile
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+    depends_on:
+      mongo:
+        condition: service_healthy
+
   api:
     build:
       context: ./backend
@@ -136,4 +189,6 @@ volumes:
   kafka_data:
   mongo_data:
   spark_checkpoints:
+  stream_checkpoints:
+  stream_ivy:
 

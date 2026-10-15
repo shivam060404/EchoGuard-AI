@@ -1,0 +1,7 @@
+[
+  {"query": "PAY-502 amount deducted but checkout failed", "tenant_id": "demo-tenant", "product": "payments", "expected_document_id": "payment-pay502-runbook"},
+  {"query": "My card was debited yet renewal did not complete", "tenant_id": "demo-tenant", "product": "payments", "expected_document_id": "payment-pay502-runbook"},
+  {"query": "AUTH-401 valid password but login rejected", "tenant_id": "demo-tenant", "product": "identity", "expected_document_id": "auth401-runbook"},
+  {"query": "Users cannot sign in even with correct credentials", "tenant_id": "demo-tenant", "product": "identity", "expected_document_id": "auth401-runbook"},
+  {"query": "What should we check before retrying a charged card?", "tenant_id": "demo-tenant", "product": "payments", "expected_document_id": "payment-pay502-runbook"}
+]

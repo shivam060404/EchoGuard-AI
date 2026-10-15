@@ -132,19 +132,40 @@ def publish_messages(messages: list[PreparedMessage], producer: ProducerLike,
     for index, item in enumerate(messages):
         if rate_per_second is not None:
             scheduled = started + index / rate_per_second
-            while time.monotonic() < scheduled:
-                if time.monotonic() >= deadline:
+
+            while True:
+                now = time.monotonic()
+                remaining = deadline - now
+
+                if remaining <= 0:
                     raise TimeoutError("Publish pacing exceeded timeout")
-                producer.poll(min(0.1, scheduled - time.monotonic()))
+
+                wait_until_scheduled = scheduled - now
+
+                if wait_until_scheduled <= 0:
+                    break
+
+                producer.poll(
+                    min(0.1, wait_until_scheduled, remaining)
+                )
+            
+
         while True:
             if time.monotonic() >= deadline:
                 raise TimeoutError("Producer queue did not accept all messages")
+
             try:
-                producer.produce(item.topic, value=item.value, key=item.key,
-                                 headers=item.headers, on_delivery=on_delivery)
+                producer.produce(
+                    item.topic,
+                    value=item.value,
+                    key=item.key,
+                    headers=item.headers,
+                    on_delivery=on_delivery,
+                )
                 break
             except BufferError:
                 producer.poll(0.5)
+
         producer.poll(0)
 
     remaining = producer.flush(max(0.0, deadline - time.monotonic()))

@@ -18,7 +18,7 @@
 - `python3 -m pytest -c backend/pyproject.toml -q` — **14 tests passed** at the Phase 1 gate, including deterministic replay, tamper detection, DLQ recovery bytes, producer failure handling, and run-specific verifier behavior.
 - Contract validation, Compose static configuration (including the demo profile), and shell syntax checks pass.
 
-## Live gate still open
+## Live broker gate
 
-The workspace denies access to the Docker socket, so Kafka topic creation, producer image build, broker publish, and read-back could not run here. On a Docker-enabled machine, run `backend/ingest/demo.sh`; the CI `phase1-kafka` job runs the same publish and verify sequence. Do not mark Phase 1 complete until one of those live gates passes. Phase 0's container smoke gate also remains open for the same reason.
+On 15 October 2026, the user ran the Docker-backed demo locally. The producer image built, Kafka was healthy, and the publish receipt reported **263** records on `support.raw.v1` and **2** on `ingest.dlq.v1` for run `1d09d09b0de842eba90704e0d941191c`. The read-back verifier reported `status: verified` with the same run ID and topic counts. This passes the Phase 1 live broker gate. The Codex workspace itself still cannot access the Docker socket, and Phase 0's separate container smoke gate remains open.
 

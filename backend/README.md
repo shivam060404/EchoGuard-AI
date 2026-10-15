@@ -2,9 +2,9 @@
 
 This folder owns the FastAPI service, Spark streaming job, workers, and event contracts. Its Docker build context is `backend/`; it does not import or package frontend code.
 
-Phase 0 runs the API health endpoints. Phase 1 adds seeded synthetic ingestion under `ingest/`. Subsequent phases add streaming, correlation, retrieval, and controlled workflow modules here.
+Phase 0 runs the API health endpoints. Phase 1 adds seeded synthetic ingestion under `ingest/`. Phase 2 adds Spark normalization and candidate signals under `stream/`. Phase 3 adds the Kafka-to-MongoDB case writer and deterministic correlation under `worker/`. Phase 4 adds approved runbook retrieval under `knowledge/`. Controlled workflow modules follow in later phases.
 
-All API routers are registered in `api/main.py`; endpoint implementations live in `api/routes/`. The single `requirements.txt` supplies both backend service images, local checks, and CI.
+All API routers are registered in `api/main.py`; endpoint implementations live in `api/routes/`. The single `requirements.txt` supplies backend service images, local checks, and CI.
 
 API environment settings are validated in `api/config.py` at startup. Backend tests and pytest configuration live in this folder. Run them from the repository root with `python3 -m pytest -c backend/pyproject.toml -q`.
 

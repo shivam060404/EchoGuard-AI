@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "stream-dlq-0-1",
+  "source_topic": "support.raw.v1",
+  "source_partition": 0,
+  "source_offset": 1,
+  "record_key_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reason_code": "late_event",
+  "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "failed_at": "2026-10-15T10:10:00Z",
+  "validation_stage": "stream"
+}

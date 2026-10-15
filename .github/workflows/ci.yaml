@@ -21,8 +21,9 @@ jobs:
       - run: python -m pytest -c backend/pyproject.toml -q
       - run: docker compose config --quiet
       - run: docker compose --profile demo config --quiet
+      - run: docker compose --profile stream config --quiet
       - run: docker compose build api web
-      - run: sh -n infra/kafka/init_topics.sh && sh -n backend/ingest/demo.sh && sh -n infra/smoke.sh
+      - run: sh -n infra/kafka/init_topics.sh && sh -n backend/ingest/demo.sh && sh -n backend/stream/demo.sh && sh -n backend/worker/demo.sh && sh -n backend/knowledge/demo.sh && sh -n infra/smoke.sh
       - run: npm ci
         working-directory: frontend
       - run: npm run typecheck
@@ -46,4 +47,56 @@ jobs:
       - run: docker compose --profile demo run --rm producer verify
       - if: always()
         run: docker compose --profile demo down -v
+
+  phase2-stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: python -m backend.ingest.cli generate
+      - run: docker compose --profile stream up -d --build stream-job
+      - run: docker compose --profile demo build producer
+      - run: docker compose --profile demo run --rm producer publish --rate 0
+      - run: docker compose --profile stream exec -T stream-job python3 -m backend.stream.verify --bootstrap kafka:19092 --timeout 300
+      - if: failure()
+        run: docker compose --profile stream logs stream-job kafka topic-init
+      - if: always()
+        run: docker compose --profile stream --profile demo down -v
+
+  phase3-cases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: python -m backend.ingest.cli generate
+      - run: docker compose --profile stream --profile worker up -d --build stream-job case-writer
+      - run: docker compose --profile demo build producer
+      - run: docker compose --profile demo run --rm producer publish --rate 0
+      - run: docker compose --profile worker exec -T case-writer python -m backend.worker.verify --timeout 300
+      - if: failure()
+        run: docker compose --profile stream --profile worker logs stream-job case-writer kafka mongo
+      - if: always()
+        run: docker compose --profile stream --profile worker --profile demo down -v
+
+  phase4-knowledge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d mongo
+      - run: docker compose --profile knowledge build knowledge-tool
+      - run: docker compose --profile knowledge run --rm knowledge-tool python -m backend.knowledge.seed
+      - run: docker compose --profile knowledge run --rm knowledge-tool python -m backend.knowledge.evaluate
+      - if: failure()
+        run: docker compose logs mongo
+      - if: always()
+        run: docker compose --profile knowledge down -v
 
