@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echoguard.local/contracts/support.raw.v1.schema.json",
+  "title": "EchoGuard raw support event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "tenant_id", "trace_id", "source", "source_message_id", "channel", "customer_id", "event_time", "ingest_time", "product", "text"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "trace_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source": {"type": "string", "enum": ["simulator", "web_chat", "email", "ticket", "alert"]},
+    "source_message_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "channel": {"type": "string", "enum": ["web_chat", "email", "ticket", "alert"]},
+    "customer_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "event_time": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "ingest_time": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "product": {"type": "string", "minLength": 1, "maxLength": 128},
+    "text": {"type": "string", "minLength": 1, "maxLength": 20000},
+    "error_code": {"type": ["string", "null"], "maxLength": 128},
+    "metadata": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}, "maxProperties": 32}
+  }
+}
+

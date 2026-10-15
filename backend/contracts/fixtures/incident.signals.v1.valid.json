@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "signal-demo-tenant-payments-PAY-502-20261015T100500Z",
+  "signal_id": "signal-demo-tenant-payments-PAY-502-20261015T100500Z",
+  "tenant_id": "demo-tenant",
+  "trace_id": "trace-signal-0001",
+  "signal_key": "payments:PAY-502",
+  "product": "payments",
+  "error_code": "PAY-502",
+  "window_start": "2026-10-15T10:05:00Z",
+  "window_end": "2026-10-15T10:10:00Z",
+  "detected_time": "2026-10-15T10:06:00Z",
+  "current_count": 150,
+  "baseline_count": 5.0,
+  "ratio": 30.0,
+  "distinct_customers": 148,
+  "sample_event_ids": ["evt-pay-0001"],
+  "rule_version": "spike-1.0.0"
+}
+

@@ -1,0 +1,49 @@
+name: Phase 0 checks
+on:
+  push:
+  pull_request:
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r backend/requirements.txt
+      - run: python -m backend.contracts.check_contracts
+      - run: python -m backend.ingest.cli generate && python -m backend.ingest.cli inspect > /dev/null
+      - run: python -m pytest -c backend/pyproject.toml -q
+      - run: docker compose config --quiet
+      - run: docker compose --profile demo config --quiet
+      - run: docker compose build api web
+      - run: sh -n infra/kafka/init_topics.sh && sh -n backend/ingest/demo.sh && sh -n infra/smoke.sh
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  phase1-kafka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: python -m backend.ingest.cli generate
+      - run: docker compose up -d kafka topic-init
+      - run: docker compose --profile demo build producer
+      - run: docker compose --profile demo run --rm producer publish --rate 0
+      - run: docker compose --profile demo run --rm producer verify
+      - if: always()
+        run: docker compose --profile demo down -v
+

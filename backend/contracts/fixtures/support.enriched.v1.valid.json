@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "evt-pay-0001",
+  "tenant_id": "demo-tenant",
+  "trace_id": "trace-pay-0001",
+  "customer_id": "customer-0001",
+  "event_time": "2026-10-15T10:05:00Z",
+  "processed_time": "2026-10-15T10:05:04Z",
+  "channel": "web_chat",
+  "product": "payments",
+  "normalized_text": "payment failed but account was charged error PAY-502",
+  "error_code": "PAY-502",
+  "language": "en",
+  "redaction_status": "synthetic",
+  "processing_version": "normalize-1.0.0"
+}
+

@@ -1,0 +1,139 @@
+name: echoguard
+
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    hostname: kafka
+    environment:
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:19092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:${ECHOGUARD_KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - 127.0.0.1:${ECHOGUARD_KAFKA_PORT:-9092}:9092
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:19092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  topic-init:
+    image: apache/kafka:4.3.1
+    entrypoint: ["/bin/sh", "/opt/echoguard/init_topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    volumes:
+      - ./infra/kafka/init_topics.sh:/opt/echoguard/init_topics.sh:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+
+  producer:
+    profiles: ["demo"]
+    build:
+      context: ./backend
+      dockerfile: ingest/Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    volumes:
+      - ./data/scenarios:/app/data/scenarios
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+    command: ["publish"]
+
+  mongo:
+    image: mongo:8.0.32-noble
+    command: ["mongod", "--bind_ip_all"]
+    ports:
+      - 127.0.0.1:${ECHOGUARD_MONGO_PORT:-27017}:27017
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  spark:
+    image: apache/spark:4.0.4-scala2.13-java17-python3-r-ubuntu
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
+    environment:
+      SPARK_LOCAL_IP: 127.0.0.1
+    volumes:
+      - spark_checkpoints:/opt/spark/checkpoints
+      - ./backend/stream:/opt/echoguard/stream:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -x /opt/spark/bin/spark-submit"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: api/Dockerfile
+    environment:
+      ECHOGUARD_KAFKA_HOST: kafka
+      ECHOGUARD_KAFKA_PORT: 19092
+      ECHOGUARD_MONGO_HOST: mongo
+      ECHOGUARD_MONGO_PORT: 27017
+    ports:
+      - 127.0.0.1:${ECHOGUARD_API_PORT:-8000}:8000
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      INTERNAL_API_URL: http://api:8000
+    ports:
+      - 127.0.0.1:${ECHOGUARD_WEB_PORT:-3000}:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+volumes:
+  kafka_data:
+  mongo_data:
+  spark_checkpoints:
+

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echoguard.local/contracts/support.enriched.v1.schema.json",
+  "title": "EchoGuard enriched support event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "tenant_id", "trace_id", "customer_id", "event_time", "processed_time", "channel", "product", "normalized_text", "redaction_status", "processing_version"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "trace_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "customer_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "event_time": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "processed_time": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "channel": {"type": "string", "enum": ["web_chat", "email", "ticket", "alert"]},
+    "product": {"type": "string", "minLength": 1, "maxLength": 128},
+    "normalized_text": {"type": "string", "minLength": 1, "maxLength": 20000},
+    "error_code": {"type": ["string", "null"], "maxLength": 128},
+    "language": {"type": "string", "minLength": 2, "maxLength": 16},
+    "redaction_status": {"type": "string", "enum": ["redacted", "synthetic"]},
+    "processing_version": {"type": "string", "minLength": 1, "maxLength": 64}
+  }
+}
+

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echoguard.local/contracts/ingest.dlq.v1.schema.json",
+  "title": "EchoGuard ingestion dead-letter event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "tenant_id", "trace_id", "source_topic", "source_record_id", "record_key", "reason_code", "payload_sha256", "payload_base64", "failed_at", "validation_stage"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "trace_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source_topic": {"type": "string", "const": "support.raw.v1"},
+    "source_record_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "record_key": {"type": "string", "minLength": 1, "maxLength": 256},
+    "reason_code": {"type": "string", "enum": ["invalid_json", "schema_violation", "key_mismatch", "oversize", "unknown_schema"]},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "payload_base64": {"type": "string", "minLength": 1},
+    "failed_at": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "validation_stage": {"type": "string", "const": "ingest"}
+  }
+}
+

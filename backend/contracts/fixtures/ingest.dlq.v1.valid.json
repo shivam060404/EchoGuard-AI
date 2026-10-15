@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "dlq-demo-invalid-0001",
+  "tenant_id": "demo-tenant",
+  "trace_id": "trace-invalid-0001",
+  "source_topic": "support.raw.v1",
+  "source_record_id": "invalid-0001",
+  "record_key": "demo-tenant:invalid-0001",
+  "reason_code": "invalid_json",
+  "payload_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "payload_base64": "eyJpbnZhbGlkIjo=",
+  "failed_at": "2026-10-15T10:12:00Z",
+  "validation_stage": "ingest"
+}
+

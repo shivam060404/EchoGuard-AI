@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "event_id": "evt-pay-0001",
+  "tenant_id": "demo-tenant",
+  "trace_id": "trace-pay-0001",
+  "source": "simulator",
+  "source_message_id": "chat-0001",
+  "channel": "web_chat",
+  "customer_id": "customer-0001",
+  "event_time": "2026-10-15T10:05:00Z",
+  "ingest_time": "2026-10-15T10:05:01Z",
+  "product": "payments",
+  "text": "Payment failed but my account was charged. Error PAY-502.",
+  "error_code": "PAY-502",
+  "metadata": {"region": "ap-south-1", "synthetic": true}
+}
+
