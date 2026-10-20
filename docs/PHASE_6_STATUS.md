@@ -12,13 +12,11 @@
 
 69 backend tests pass locally, including action crash/retry, stale/expired/revoked approval boundaries, tenant/role isolation, edit/reapproval, and monitoring evidence sufficiency. Next.js typecheck and production build pass. Python compilation, shell syntax, and Compose configuration pass.
 
-Docker API access from the agent workspace is denied. The live Phase 6 gate must run in the Docker-enabled terminal:
+## User-provided live HTTP gate — passed
 
-```sh
-bash backend/api/demo.sh
-```
+The user supplied run `wf-d728e70928133d7559f40b7444dc1e6a`: `status: verified`, `session_proxy: passed`, `approval_edit: passed`, `duplicate_action: idempotent`, and `outcome: insufficient_data`. API/web/Kafka/Mongo reported healthy.
 
-Expect `status: verified`, `session_proxy: passed`, `approval_edit: passed`, and `duplicate_action: idempotent`. The gate tests HTTP behavior through Next.js; a manual browser review and automated browser tests remain separate checks. No live Phase 6 success is claimed yet.
+This verifies the HTTP session/proxy/review/action scenario. It does not establish a browser interaction test, completed post-action monitoring, closure/reopen, or broad failure recovery. The Docker socket remains inaccessible to the agent process. See [the 20 October audit](IMPLEMENTATION_AUDIT.md) for remaining gates and reproduced recovery gaps.
 
 ## Scope and remaining release work
 

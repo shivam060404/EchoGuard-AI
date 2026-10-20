@@ -26,11 +26,16 @@ class Repository:
 
 class Adapter:
     def __init__(self):
-        self.effects = set()
+        self.effects = {}
 
     def perform(self, tenant, action, state):
-        self.effects.add(action['action_id'])
-        return {'reference': action['action_id'], 'simulated': True}
+        self.effects.setdefault(action['action_id'], {
+            'result': {'reference': action['action_id'], 'simulated': True},
+            'completed_at': NOW.isoformat()})
+        return self.lookup(tenant, action)
+
+    def lookup(self, tenant, action):
+        return self.effects.get(action['action_id'])
 
 
 def prepared(approve=True):
@@ -90,3 +95,28 @@ def test_outcome_requires_baseline_and_stream_progress(progress, before, after, 
     result = outcome(SimpleNamespace(cases=Cases()), 'tenant-a', INCIDENT,
                      {'status': 'succeeded', 'completed_at': NOW.isoformat()}, NOW + timedelta(minutes=6))
     assert result['status'] == expected
+
+
+@pytest.mark.parametrize('fault', ['expired', 'stale', 'revoked'])
+def test_existing_effect_reconciles_without_reauthorization(fault):
+    service, state, store, retriever, repo, adapter = prepared()
+    repo.fail_complete = True
+    with pytest.raises(ConnectionError):
+        execute(service, state)
+    repo.fail_complete = False
+    if fault == 'expired': service.clock = lambda: NOW + timedelta(days=2)
+    if fault == 'stale': store.incident['peak_count'] += 1
+    if fault == 'revoked': retriever.hits = []
+    result = execute(service, state)
+    assert result['status'] == 'succeeded'
+    assert result['completed_at'] == NOW.isoformat()
+    assert len(adapter.effects) == 1
+
+
+def test_pending_without_effect_does_not_bypass_expiry():
+    service, state, _, _, repo, adapter = prepared()
+    repo.action = {'action_id': 'missing', 'status': 'pending'}
+    service.clock = lambda: NOW + timedelta(days=2)
+    with pytest.raises(Conflict, match='expired'):
+        execute(service, state)
+    assert not adapter.effects

@@ -1,6 +1,8 @@
 # EchoGuard AI — implementation plan
 
-Status: approved; Phase 1–3 seeded local demos passed on 15 October 2026; Phase 4 retrieval and Phase 5 workflow live gates passed on 16 October 2026; Phase 6 console/action implementation is locally checked and awaits its live gate; Phase 0 smoke gate remains open
+Status: approved; Phase 1–3 seeded local demos passed on 15 October 2026; Phase 4 retrieval and Phase 5 workflow live gates passed on 16 October 2026; Phase 6 HTTP console/action gate passed in the user-provided run wf-d728e70928133d7559f40b7444dc1e6a; full outcome/browser/recovery gates remain; Phase 0 smoke gate remains open
+
+Audit (20 October 2026): see [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md) for verified scope, correctness findings, outstanding deliverables, and the ordered completion plan. Seeded demo success does not mark every phase deliverable complete.
 
 ## 1. Goal, boundary, and first release
 

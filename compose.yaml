@@ -1,9 +1,22 @@
 name: echoguard
 
 services:
+  kafka-volume-init:
+    image: apache/kafka:4.3.1
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/opt/echoguard/init_volume.sh"]
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+      - ./infra/kafka/init_volume.sh:/opt/echoguard/init_volume.sh:ro
+    restart: "no"
+
   kafka:
     image: apache/kafka:4.3.1
+    user: "1000:1000"
     hostname: kafka
+    depends_on:
+      kafka-volume-init:
+        condition: service_completed_successfully
     environment:
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
       KAFKA_NODE_ID: 1

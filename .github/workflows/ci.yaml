@@ -126,3 +126,19 @@ jobs:
         run: docker compose logs --tail=100 api web case-writer stream-job
       - if: always()
         run: docker compose --profile worker --profile stream --profile knowledge --profile demo down -v
+
+  recovery-fresh-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: python -m backend.verification.fresh_pipeline
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: fresh-pipeline-report
+          path: data/scenarios/fresh-pipeline-report.json

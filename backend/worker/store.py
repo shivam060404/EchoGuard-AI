@@ -90,41 +90,44 @@ class CaseStore:
                 "event_time": signal["window_start"],
             }}, upsert=True,
         )
-        reopened = self.db.incidents.update_one(
-            {"_id": incident_id, "status": "resolved",
-             "resolved_at": {"$lt": signal["window_end"]}},
-            {"$set": {"status": "reopened", "reopened_by_signal_id": signal["_id"]},
-             "$inc": {"version": 1}},
-        )
-        if reopened.modified_count:
-            self.db.audit_events.update_one(
-                {"_id": f"audit-{incident_id}-reopened-{signal['_id']}"},
-                {"$setOnInsert": {
-                    "_id": f"audit-{incident_id}-reopened-{signal['_id']}",
-                    "tenant_id": signal["tenant_id"], "subject_id": incident_id,
-                    "kind": "incident_reopened", "event_time": signal["window_end"],
-                }}, upsert=True,
-            )
+        self.reopen_incident(signal["tenant_id"], incident_id, signal["_id"], signal["window_end"])
         return cluster_id
+
+    def project_lifecycle_audit(self, tenant_id: str, incident_id: str) -> None:
+        """Repair the queryable ledger from the authoritative atomic incident journal."""
+        incident = self.db.incidents.find_one({"_id": incident_id, "tenant_id": tenant_id})
+        for event in (incident or {}).get("lifecycle_audit", []):
+            self.db.audit_events.update_one({"_id": event["_id"]},
+                                            {"$setOnInsert": event}, upsert=True)
+
+    def reopen_incident(self, tenant_id: str, incident_id: str, signal_id: str,
+                        window_end: datetime) -> bool:
+        event = {"_id": f"audit-{incident_id}-reopened-{signal_id}",
+                 "tenant_id": tenant_id, "subject_id": incident_id,
+                 "kind": "incident_reopened", "event_time": window_end}
+        result = self.db.incidents.update_one(
+            {"_id": incident_id, "tenant_id": tenant_id, "status": "resolved",
+             "resolved_at": {"$lt": window_end}},
+            {"$set": {"status": "reopened", "reopened_by_signal_id": signal_id},
+             "$inc": {"version": 1}, "$push": {"lifecycle_audit": event}},
+        )
+        # Always project, including when replay observes an already-applied transition.
+        self.project_lifecycle_audit(tenant_id, incident_id)
+        return bool(result.modified_count)
 
     def resolve_incident(self, tenant_id: str, incident_id: str,
                          expected_version: int, resolved_at: datetime) -> bool:
-        """Compare-and-set close used by a future authenticated review API."""
+        """Compare-and-set close with an atomic journal and replayable ledger."""
         if resolved_at.tzinfo is None or resolved_at.utcoffset().total_seconds() != 0:
             raise ValueError("resolved_at must be UTC")
+        event = {"_id": f"audit-{incident_id}-resolved-v{expected_version}",
+                 "tenant_id": tenant_id, "subject_id": incident_id,
+                 "kind": "incident_resolved", "event_time": resolved_at}
         result = self.db.incidents.update_one(
             {"_id": incident_id, "tenant_id": tenant_id,
              "version": expected_version, "status": {"$in": ["candidate", "reopened"]}},
             {"$set": {"status": "resolved", "resolved_at": resolved_at},
-             "$inc": {"version": 1}},
+             "$inc": {"version": 1}, "$push": {"lifecycle_audit": event}},
         )
-        if result.modified_count:
-            self.db.audit_events.update_one(
-                {"_id": f"audit-{incident_id}-resolved-v{expected_version}"},
-                {"$setOnInsert": {
-                    "_id": f"audit-{incident_id}-resolved-v{expected_version}",
-                    "tenant_id": tenant_id, "subject_id": incident_id,
-                    "kind": "incident_resolved", "event_time": resolved_at,
-                }}, upsert=True,
-            )
+        self.project_lifecycle_audit(tenant_id, incident_id)
         return bool(result.modified_count)

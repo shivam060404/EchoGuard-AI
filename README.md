@@ -2,7 +2,7 @@
 
 EchoGuard AI is a project for detecting support incidents from live customer messages, investigating them with evidence, and sending proposed actions through human approval.
 
-**Current state:** Kafka, Spark, MongoDB correlation, approved retrieval, and the LangGraph checkpoint/review workflow have passed local live gates. The authenticated Next.js review console and simulated action/outcome loop are implemented; their live gate is pending. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) and [console guide](backend/api/README.md).
+**Current state:** Kafka, Spark, MongoDB correlation, approved retrieval, and the LangGraph checkpoint/review workflow have passed local live gates. The authenticated Next.js review console and simulated action HTTP gate have also passed. Full outcome monitoring, browser tests, recovery hardening and release benchmarks remain open; see the [implementation audit](docs/IMPLEMENTATION_AUDIT.md). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) and [console guide](backend/api/README.md).
 
 ## What works today
 

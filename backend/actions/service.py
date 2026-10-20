@@ -21,6 +21,15 @@ class ActionService:
             existing = self.repo.get(actor.tenant_id, run_id)
             if existing and existing["status"] == "succeeded":
                 return existing
+            # Reconciliation reads an existing effect; it never authorizes a new one.
+            # Keep this before freshness checks so expiry/revocation cannot strand an
+            # effect that was already committed by the adapter.
+            if existing:
+                effect = self.adapter.lookup(actor.tenant_id, existing)
+                if effect is not None:
+                    completed = {**existing, "status": "succeeded", **effect}
+                    self.repo.complete(actor.tenant_id, run_id, owner, completed)
+                    return completed
             if self.clock() >= datetime.fromisoformat(state["expires_at"]):
                 raise Conflict("Approval expired")
             current, _ = self.workflow.store.context(actor.tenant_id, state["incident"]["incident_id"])
@@ -43,9 +52,8 @@ class ActionService:
             }
             self.repo.pending(actor.tenant_id, run_id, owner, action)
             # This adapter is a local database simulation, never a remote HTTP integration.
-            result = self.adapter.perform(actor.tenant_id, action, state)
-            completed = {**action, "status": "succeeded", "result": result,
-                         "completed_at": self.clock().isoformat()}
+            effect = self.adapter.perform(actor.tenant_id, action, state)
+            completed = {**action, "status": "succeeded", **effect}
             self.repo.complete(actor.tenant_id, run_id, owner, completed)
             return completed
 
@@ -77,6 +85,18 @@ class SimulatedAdapter:
     def __init__(self, database):
         self.db = database
 
+    def lookup(self, tenant, action):
+        record = self.db.simulated_actions.find_one({"_id": action["action_id"], "tenant_id": tenant})
+        if record is None:
+            return None
+        if record.get("proposal_hash") != action["proposal_hash"] or record.get("kind") != action["kind"]:
+            raise Conflict("Stored effect does not match authorized action")
+        if "completed_at" not in record:
+            # Older effects have no trustworthy effect timestamp. Do not invent one
+            # or execute again; require explicit operator reconciliation.
+            raise Conflict("Legacy simulated effect requires timestamp reconciliation")
+        return {"result": record["result"], "completed_at": record["completed_at"]}
+
     def perform(self, tenant, action, state):
         action_id = action["action_id"]
         result = {"reference": "SIM-" + action_id.removeprefix("act-")[:12], "simulated": True}
@@ -86,9 +106,10 @@ class SimulatedAdapter:
                 "_id": action_id, "tenant_id": tenant, "kind": action["kind"],
                 "incident_id": state["incident"]["incident_id"],
                 "proposal_hash": action["proposal_hash"], "result": result,
+                "completed_at": now_utc().isoformat(),
             }}, upsert=True,
         )
-        return result
+        return self.lookup(tenant, action)
 
 
 def outcome(database, tenant, incident, action, now=None):
