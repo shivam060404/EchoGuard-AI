@@ -4,8 +4,8 @@ import { accessToken, apiBase, sameOrigin } from "@/lib/session";
 export const dynamic = "force-dynamic";
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const path = (await context.params).path.join("/");
-  const read = /^(me|events|incidents|incidents\/[a-zA-Z0-9_-]+|workflows\/[a-zA-Z0-9_-]+(?:\/outcome)?)$/;
-  const write = /^(incidents\/[a-zA-Z0-9_-]+\/(workflows|resolve)|workflows\/[a-zA-Z0-9_-]+\/(decision|action|proposal))$/;
+  const read = /^(me|events|health\/ready|demo\/(status|traffic)|incidents|incidents\/[a-zA-Z0-9_-]+|workflows\/[a-zA-Z0-9_-]+(?:\/outcome)?)$/;
+  const write = /^(demo\/traffic|incidents\/[a-zA-Z0-9_-]+\/(workflows|resolve)|workflows\/[a-zA-Z0-9_-]+\/(decision|action|proposal))$/;
   if (!(request.method === "GET" ? read : write).test(path))
     return NextResponse.json({ detail: "Unknown resource" }, { status: 404 });
   if (request.method !== "GET" && !sameOrigin(request))

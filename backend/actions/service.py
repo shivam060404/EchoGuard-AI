@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from backend.workflow.models import digest, now_utc, proposal_hash
-from backend.workflow.store import Conflict
+from backend.workflow.store import Conflict, incident_snapshot
 
 
 class ActionService:
@@ -30,26 +30,33 @@ class ActionService:
                     completed = {**existing, "status": "succeeded", **effect}
                     self.repo.complete(actor.tenant_id, run_id, owner, completed)
                     return completed
-            if self.clock() >= datetime.fromisoformat(state["expires_at"]):
-                raise Conflict("Approval expired")
-            current, _ = self.workflow.store.context(actor.tenant_id, state["incident"]["incident_id"])
-            if digest(current) != digest(state["incident"]):
-                raise Conflict("Incident changed after approval")
-            hits = self.workflow.retriever.retrieve(
-                tenant_id=actor.tenant_id, product=current["product"],
-                query=f"{current['product']} {current['error_code'] or ''}", as_of=self.clock(), top_k=5)
-            knowledge = {hit.citation: hit.text for hit in hits}
-            if any(knowledge.get(step["citation"]) != step["quote"] for step in state["proposal"]["steps"]):
-                raise Conflict("Approved knowledge changed")
             kind = state["proposal"]["action"]
             if kind not in {"create_ticket", "post_internal_notification"}:
                 raise Conflict("Action is not permitted")
             action = existing or {
-                "action_id": "act-" + digest([actor.tenant_id, current["incident_id"], expected_hash, kind])[:32],
+                "action_id": "act-" + digest([actor.tenant_id, state["incident"]["incident_id"], expected_hash, kind])[:32],
                 "status": "pending", "kind": kind, "proposal_hash": expected_hash,
                 "requested_by": actor.actor_id, "approved_by": state["decision"]["actor_id"],
                 "request_key": request_key, "requested_at": self.clock().isoformat(),
             }
+            claim = self.repo.claimed(actor.tenant_id, run_id, state, action)
+            if claim is None:
+                if self.clock() >= datetime.fromisoformat(state["expires_at"]):
+                    raise Conflict("Approval expired")
+                current, _ = self.workflow.store.context(actor.tenant_id, state["incident"]["incident_id"])
+                if digest(current) != digest(state["incident"]):
+                    raise Conflict("Incident changed after approval")
+                hits = self.workflow.retriever.retrieve(
+                    tenant_id=actor.tenant_id, product=current["product"],
+                    query=f"{current['product']} {current['error_code'] or ''}", as_of=self.clock(), top_k=5)
+                knowledge = {hit.citation: hit.text for hit in hits}
+                if any(knowledge.get(step["citation"]) != step["quote"] for step in state["proposal"]["steps"]):
+                    raise Conflict("Approved knowledge changed")
+                action = self.repo.claim(actor.tenant_id, run_id, state, action)
+            else:
+                # A claim was authorized against the incident at its atomic
+                # update. A later worker update does not revoke that intent.
+                action = claim
             self.repo.pending(actor.tenant_id, run_id, owner, action)
             # This adapter is a local database simulation, never a remote HTTP integration.
             effect = self.adapter.perform(actor.tenant_id, action, state)
@@ -65,6 +72,64 @@ class MongoActionRepository:
     def get(self, tenant, run_id):
         run = self.db.workflow_runs.find_one({"_id": run_id, "tenant_id": tenant})
         return run.get("action") if run else None
+
+    @staticmethod
+    def _matching_claim(record, run_id, state, action):
+        if (record.get("run_id") == run_id and record.get("action_id") == action["action_id"]
+                and record.get("proposal_hash") == action["proposal_hash"]
+                and record.get("incident_version") == state["incident"]["version"]
+                and record.get("snapshot_hash") == digest(state["incident"])):
+            return record["action"]
+        return None
+
+    def claimed(self, tenant, run_id, state, action):
+        raw = self.db.incidents.find_one({"_id": state["incident"]["incident_id"], "tenant_id": tenant},
+                                         {"execution_claim": 1})
+        if raw is None:
+            raise LookupError("Incident not found in tenant")
+        claim = raw.get("execution_claim")
+        if claim is None:
+            return None
+        matching = self._matching_claim(claim, run_id, state, action)
+        if matching is not None:
+            return matching
+        if claim.get("incident_version") == state["incident"]["version"]:
+            raise Conflict("Incident revision already has a different authorized action")
+        return None
+
+    def claim(self, tenant, run_id, state, action):
+        incident = state["incident"]
+        raw = self.db.incidents.find_one({"_id": incident["incident_id"], "tenant_id": tenant})
+        if raw is None:
+            raise LookupError("Incident not found in tenant")
+        previous = raw.get("execution_claim")
+        if previous is not None:
+            matching = self._matching_claim(previous, run_id, state, action)
+            if matching is not None:
+                return matching
+            if previous.get("incident_version") == incident["version"]:
+                raise Conflict("Incident revision already has a different authorized action")
+        if digest(incident_snapshot(raw)) != digest(incident):
+            raise Conflict("Incident changed before action authorization")
+        claim = {"run_id": run_id, "action_id": action["action_id"],
+                 "proposal_hash": action["proposal_hash"], "incident_version": incident["version"],
+                 "snapshot_hash": digest(incident), "action": action}
+        # Worker updates to last_seen, peak_count, and signal_ids use this
+        # same document. Exactly one ordering wins the single-document CAS.
+        match = {"_id": incident["incident_id"], "tenant_id": tenant,
+                 "version": raw["version"], "status": raw["status"],
+                 "peak_count": raw["peak_count"], "last_seen": raw["last_seen"],
+                 "signal_ids": raw["signal_ids"],
+                 "execution_claim": previous if previous is not None else {"$exists": False}}
+        result = self.db.incidents.update_one(match, {"$set": {"execution_claim": claim},
+                                                      "$push": {"authorization_audit": {
+                                                          "run_id": run_id, "action_id": action["action_id"],
+                                                          "proposal_hash": action["proposal_hash"],
+                                                          "actor": action["requested_by"],
+                                                          "at": action["requested_at"]}}})
+        if result.modified_count != 1:
+            raise Conflict("Incident changed during action authorization")
+        return action
 
     def _write(self, tenant, run_id, owner, action):
         result = self.db.workflow_runs.update_one(
@@ -112,14 +177,18 @@ class SimulatedAdapter:
         return self.lookup(tenant, action)
 
 
-def outcome(database, tenant, incident, action, now=None):
+def outcome(database, tenant, incident, action, now=None, window_seconds=300):
     now = now or now_utc()
+    if not 30 <= window_seconds <= 3600:
+        raise ValueError('Outcome window must be between 30 and 3600 seconds')
     if not action or action["status"] != "succeeded":
-        return {"status": "insufficient_data", "reason": "No completed action", "window_minutes": 5}
+        return {"status": "insufficient_data", "reason": "No completed action",
+                "window_seconds": window_seconds, "window_minutes": window_seconds / 60}
     started = datetime.fromisoformat(action["completed_at"])
-    end = started + timedelta(minutes=5)
+    window = timedelta(seconds=window_seconds)
+    end = started + window
     base = {"tenant_id": tenant, "product": incident["product"], "error_code": incident.get("error_code")}
-    before = database.cases.count_documents({**base, "event_time": {"$gte": started-timedelta(minutes=5), "$lt": started}})
+    before = database.cases.count_documents({**base, "event_time": {"$gte": started-window, "$lt": started}})
     after = database.cases.count_documents({**base, "event_time": {"$gte": started, "$lt": end}})
     # No complaints is not proof of a healthy pipeline: require later evidence of stream progress.
     progressed = database.cases.find_one({"tenant_id": tenant, "event_time": {"$gte": end}}, {"_id": 1})
@@ -129,5 +198,6 @@ def outcome(database, tenant, incident, action, now=None):
         ratio = after / before
         status = "improving" if ratio < .75 else "worsening" if ratio > 1.25 else "unchanged"
     return {"status": status, "before_count": before, "after_count": after,
-            "window_minutes": 5, "window_end": end.isoformat(),
+            "window_seconds": window_seconds, "window_minutes": window_seconds / 60,
+            "window_end": end.isoformat(),
             "reason": "Observed complaint counts; not proof that the simulated action caused a change"}

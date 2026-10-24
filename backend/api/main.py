@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from .config import ApiSettings
 from .routes.health import router as health_router
 from .routes.console import router as console_router
+from .routes.demo import router as demo_router
 from backend.workflow.store import Conflict
 
 
@@ -14,6 +15,7 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.state.settings = settings or ApiSettings.from_env()
     app.include_router(health_router)
     app.include_router(console_router)
+    app.include_router(demo_router)
 
     @app.exception_handler(Conflict)
     async def conflict(_request, exc):

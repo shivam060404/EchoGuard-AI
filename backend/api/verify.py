@@ -43,8 +43,10 @@ def verify(api_url, web_url, credential_file):
     actor = request(web_url, '/api/proxy/me')
     assert actor['role'] == 'reviewer'
     items = request(web_url, '/api/proxy/incidents')['items']
-    incident = next((item for item in items if item['error_code'] == 'PAY-502' and item['status'] != 'resolved'), None)
-    if not incident: raise AssertionError('No open PAY-502 incident; run backend/worker/demo.sh')
+    incident = next((item for item in items if item['error_code'] == 'PAY-502'
+                     and item['status'] != 'resolved' and not item.get('action_authorized')), None)
+    if not incident:
+        raise AssertionError('No unused PAY-502 incident revision; run backend/worker/demo.sh on a fresh workspace')
     identifier = incident['_id']
     prefix = '/api/proxy'
     key = 'phase6-' + uuid4().hex

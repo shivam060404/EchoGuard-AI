@@ -15,6 +15,8 @@ EchoGuard AI is a project for detecting support incidents from live customer mes
 - An isolated knowledge tool loads approved synthetic runbooks and evaluates tenant-scoped hybrid retrieval.
 - A LangGraph workflow validates cited proposals, persists checkpoints, and waits for a reviewer decision with stale-proposal and tenant checks.
 
+The current workflow uses `MockPlanningProvider`, a deterministic local planner. It makes no external LLM calls and needs no LLM API key.
+
 The default stack starts an idle Spark runtime. The streaming job runs through an opt-in Compose profile.
 
 ## Prerequisites
@@ -27,7 +29,20 @@ Run the commands below from the repository root.
 
 ## Run the review console
 
-With the backend virtual environment installed as below and Docker running:
+For a fresh, repeatable local incident scenario, with the backend virtual
+environment installed as below and Docker running:
+
+```sh
+python -m backend.demo.local start
+```
+
+Open the printed web URL, use the reviewer token from the printed credentials
+file, and follow the guided flow in the console. It includes a one-minute
+synthetic monitoring example and leaves the isolated stack running. See the
+[local demo guide](backend/demo/README.md) for the exact presentation steps and
+cleanup command.
+
+For the older seeded regression demo on the regular `echoguard` stack:
 
 ```sh
 bash backend/api/demo.sh
@@ -166,6 +181,4 @@ Python dependencies are pinned in [backend/requirements.txt](backend/requirement
 
 ## Release status
 
-This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Case persistence has passed its local demo. Retrieval and the controlled workflow await live gates. Public authentication, the review console, action execution, observability, and outcome verification remain planned.
-
-The [Phase 5 status](docs/PHASE_5_STATUS.md) records the current integration gates; earlier phases are documented in the same directory.
+This Compose setup uses synthetic data, a single local Kafka broker, and MongoDB without authentication. Do not use it with real customer data or expose it as a production service. Seeded retrieval, controlled workflow, HTTP review, simulated action, and isolated restart/replay gates have passed. Complete outcome monitoring, observability, held-out evaluation, browser automation, and release hardening remain open. See the [implementation audit](docs/IMPLEMENTATION_AUDIT.md) for the phase-by-phase verdict.

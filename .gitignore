@@ -14,3 +14,4 @@ data/scenarios/
 .DS_Store
 
 data/local-auth.json
+data/local_demo/

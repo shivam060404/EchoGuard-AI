@@ -11,9 +11,19 @@ from backend.tests.test_workflow import setup, NOW, OPERATOR, REVIEWER, INCIDENT
 class Repository:
     action = None
     fail_complete = False
+    authorization = None
 
     def get(self, *args):
         return copy.deepcopy(self.action)
+
+    def claimed(self, tenant, run_id, state, action):
+        if self.authorization and self.authorization['action_id'] == action['action_id']:
+            return copy.deepcopy(self.authorization)
+        return None
+
+    def claim(self, tenant, run_id, state, action):
+        self.authorization = copy.deepcopy(action)
+        return copy.deepcopy(action)
 
     def pending(self, *args):
         self.action = copy.deepcopy(args[-1])

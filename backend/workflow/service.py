@@ -47,7 +47,8 @@ class WorkflowService:
             self.store.save(principal.tenant_id, run_id, owner, state)
         return state
 
-    def start(self, principal: Principal, incident_id: str, request_key: str):
+    def start(self, principal: Principal, incident_id: str, request_key: str,
+              expected_version: int | None = None):
         self._principal(principal)
         if not 1 <= len(request_key) <= 128:
             raise ValueError("Request key must contain 1–128 characters")
@@ -55,6 +56,8 @@ class WorkflowService:
         existing = self.store.get(principal.tenant_id, run_id)
         if existing is None:
             incident, evidence = self.store.context(principal.tenant_id, incident_id)
+            if expected_version is not None and incident["version"] != expected_version:
+                raise Conflict("Incident version changed")
             if incident["status"] not in {"candidate", "reopened", "investigating"}:
                 raise Conflict("Incident is not eligible for investigation")
             now = self.clock()
@@ -68,6 +71,9 @@ class WorkflowService:
                                           "owner": None, "audit": []})
         if existing["incident_id"] != incident_id:
             raise Conflict("Request key already belongs to a different incident")
+        if (expected_version is not None
+                and existing["initial"]["incident"]["version"] != expected_version):
+            raise Conflict("Request key already belongs to a different incident version")
         self._record(principal, run_id)
         with self.store.locked(principal.tenant_id, run_id) as owner:
             snapshot = self.graph.get_state(self.config(run_id))

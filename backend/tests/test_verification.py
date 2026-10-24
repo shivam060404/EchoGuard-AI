@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 from backend.verification.fresh_pipeline import isolated_config
+from backend.verification.offsets import committed_spark_offsets, covers
 
 
 def test_gate_cannot_reuse_named_volumes_or_host_ports():
@@ -20,6 +21,21 @@ def test_gate_cannot_reuse_named_volumes_or_host_ports():
 def test_gate_rejects_external_resources():
     with pytest.raises(ValueError, match='External'):
         isolated_config({'volumes': {'shared': {'external': True}}}, 'gate', Path('/tmp'))
+
+
+def test_spark_checkpoint_requires_a_committed_batch(tmp_path):
+    checkpoint = tmp_path / 'enriched-v1'
+    (checkpoint / 'offsets').mkdir(parents=True)
+    (checkpoint / 'commits').mkdir()
+    (checkpoint / 'offsets' / '0').write_text(
+        'v1\n{"batchWatermarkMs":0}\n{"support.raw.v1":{"0":4,"1":6}}\n')
+    assert committed_spark_offsets(checkpoint, 'support.raw.v1') == {}
+    (checkpoint / 'commits' / '0').write_text('v1\n{}\n')
+    assert committed_spark_offsets(checkpoint, 'support.raw.v1') == {'0': 4, '1': 6}
+    assert covers({'0': 4, '1': 6}, {'0': 4, '1': 6})
+    assert not covers({'0': 4, '1': 5}, {'0': 4, '1': 6})
+    assert not covers({'0': 4}, {'0': 4, '1': 6})
+    assert covers({'0': 4}, {'0': 4, '1': 0})
 
 
 def test_rendered_gate_keeps_volume_initialization_dependency(tmp_path):

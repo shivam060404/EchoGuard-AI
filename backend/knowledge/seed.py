@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import argparse
 from pathlib import Path
 
 from backend.knowledge.model import build_document
@@ -17,6 +18,13 @@ def load_sources(path: Path = SEED_PATH) -> list[dict]:
     if not isinstance(sources, list) or not sources:
         raise ValueError("Knowledge seed must be a nonempty list")
     return sources
+
+
+def sources_for_tenant(tenant: str, sources: list[dict] | None = None) -> list[dict]:
+    if not tenant or len(tenant) > 128:
+        raise ValueError('Tenant must contain 1–128 characters')
+    return [dict(source, tenant_id=tenant) if source['tenant_id'] == 'demo-tenant'
+            else source for source in (sources if sources is not None else load_sources())]
 
 
 def seed(database, sources: list[dict]) -> dict[str, int]:
@@ -60,9 +68,15 @@ def seed(database, sources: list[dict]) -> dict[str, int]:
 def main() -> None:
     from pymongo import MongoClient
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--tenant', default='demo-tenant')
+    args = parser.parse_args()
+    if not args.tenant or len(args.tenant) > 128:
+        parser.error('--tenant must contain 1–128 characters')
+    sources = sources_for_tenant(args.tenant)
     uri = os.getenv("MONGO_URI", "mongodb://mongo:27017")
     with MongoClient(uri, serverSelectionTimeoutMS=5000, tz_aware=True) as client:
-        counts = seed(client.echoguard, load_sources())
+        counts = seed(client.echoguard, sources)
     print(json.dumps({"status": "seeded", **counts}, sort_keys=True))
 
 

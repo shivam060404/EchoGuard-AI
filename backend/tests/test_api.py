@@ -13,6 +13,13 @@ def test_liveness() -> None:
     assert response.json() == {"status": "ok", "service": "api"}
 
 
+def test_all_application_routes_are_registered_in_main():
+    paths = set(create_app().openapi()['paths'])
+    assert {'/health/live', '/health/ready', '/me', '/incidents',
+            '/incidents/{incident_id}', '/workflows/{run_id}',
+            '/workflows/{run_id}/outcome', '/demo/status', '/demo/traffic'} <= paths
+
+
 def test_readiness_reports_missing_dependencies(monkeypatch) -> None:
     monkeypatch.setattr("backend.api.routes.health._tcp_reachable", lambda *_args, **_kwargs: False)
     response = client.get("/health/ready")
