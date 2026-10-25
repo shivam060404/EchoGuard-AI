@@ -15,6 +15,18 @@ incidents, and the expected spike counts**. It leaves the stack running and
 prints the web URL and credential-file path. Existing EchoGuard containers and
 volumes are untouched.
 
+If startup stops because Kafka is unhealthy, inspect its logs and Docker
+Desktop memory use. Several concurrent Spark/Kafka workspaces can exhaust a
+small local Docker allocation. Stop unused workspaces without deleting their
+volumes, then continue the **same** project and credentials:
+
+```sh
+python -m backend.demo.local resume echoguard-local-XXXXXXXXXX
+```
+
+`resume` uses the existing volumes and scenario, seeds any missing runbooks,
+and publishes the scenario only when its delivery receipt is absent.
+
 Open the printed web URL and sign in with the `reviewer` token from the printed
 credentials file. The dashboard supports this sequence:
 

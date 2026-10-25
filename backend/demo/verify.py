@@ -156,6 +156,9 @@ def verify(project: str) -> dict:
     closed = request(f'/api/proxy/incidents/{identifier}')
     assert closed['incident']['status'] == 'resolved'
     assert any(item['kind'] == 'incident_resolved' for item in closed['lifecycle'])
+    listed = request('/api/proxy/incidents?limit=100')['items']
+    assert any(item['_id'] == identifier and item['status'] == 'resolved'
+               for item in listed)
     return {'status': 'verified', 'project': project, 'run_id': run_id,
             'incident_code': incident['error_code'],
             'baseline_cases': before['projected_cases'],

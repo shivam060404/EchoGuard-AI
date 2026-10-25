@@ -147,53 +147,41 @@ def require_authentication(run: dict, token: str) -> dict:
     return result
 
 
-def launch() -> None:
-    subprocess.run(['docker', 'info', '--format', '{{.ServerVersion}}'],
-                   stdout=subprocess.DEVNULL, cwd=ROOT, check=True)
-    suffix = uuid4().hex[:10]
-    project = f'echoguard-local-{suffix}'
-    tenant = f'local-{suffix}'
-    directory = ROOT / 'data' / 'local_demo' / project
-    tokens, registry = credentials(tenant, directory)
-    reserved: set[int] = set()
-    web_port, api_port, kafka_port, mongo_port = (available_port(reserved) for _ in range(4))
-    web_url = f'http://localhost:{web_port}'
-    api_url = f'http://localhost:{api_port}'
-    now = datetime.now(timezone.utc)
-    start = now.replace(minute=(now.minute // 30) * 30, second=0,
-                        microsecond=0) - timedelta(minutes=30)
-    name = f'{project}.jsonl'
-    dataset = ROOT / 'data' / 'scenarios' / name
+def complete_demo(info: dict, tokens: dict[str, str], registry: str,
+                  *, resume: bool = False) -> None:
+    project = info['project']
+    tenant = info['tenant_id']
+    expected_dataset = f'data/scenarios/{project}.jsonl'
+    if info.get('dataset') != expected_dataset:
+        raise ValueError('Demo dataset path does not match its project')
+    dataset = ROOT / expected_dataset
     manifest = dataset.with_suffix('.manifest.json')
     receipt = dataset.with_suffix('.receipt.json')
-    write_scenario(ScenarioConfig(tenant_id=tenant, start_time=start), dataset, manifest)
-    info = {'project': project, 'tenant_id': tenant, 'web_url': web_url,
-            'api_url': api_url, 'dataset': str(dataset.relative_to(ROOT)),
-            'credentials': str((directory / 'credentials.json').relative_to(ROOT)),
-            'kafka_port': kafka_port, 'mongo_port': mongo_port}
+    if not dataset.is_file() or not manifest.is_file():
+        raise FileNotFoundError('Demo scenario or manifest is missing')
     environment = project_environment(info, registry)
-    (directory / 'run.json').write_text(json.dumps(info, indent=2) + '\n')
-    print(f'Starting isolated local demo {project}. Main EchoGuard volumes are untouched.', flush=True)
+    directory = ROOT / 'data' / 'local_demo' / project
     try:
         compose(project, environment, 'up', '-d', '--build', '--wait',
                 'stream-job', 'case-writer', 'api', 'web')
         compose(project, environment, 'build', 'knowledge-tool', 'producer')
         compose(project, environment, 'run', '--rm', 'knowledge-tool',
                 'python', '-m', 'backend.knowledge.seed', '--tenant', tenant)
-        producer_args = ('--dataset', str(dataset.relative_to(ROOT)),
+        producer_args = ('--dataset', expected_dataset,
                          '--manifest', str(manifest.relative_to(ROOT)),
                          '--receipt', str(receipt.relative_to(ROOT)))
-        compose(project, environment, 'run', '--rm', 'producer', 'publish',
-                *producer_args, '--rate', '0')
+        if not resume or not receipt.is_file():
+            compose(project, environment, 'run', '--rm', 'producer', 'publish',
+                    *producer_args, '--rate', '0')
         compose(project, environment, 'run', '--rm', 'producer', 'verify', *producer_args)
         deadline = time.monotonic() + 300
         while time.monotonic() < deadline:
             try:
-                items = incident_list(api_url, tokens['reviewer'])
-                progress = demo_status(api_url, tokens['reviewer'])
+                items = incident_list(info['api_url'], tokens['reviewer'])
+                progress = demo_status(info['api_url'], tokens['reviewer'])
                 codes = {item.get('error_code') for item in items}
                 peaks = {item.get('error_code'): item.get('peak_count', 0) for item in items}
-                if (progress['cases'] == 250 and progress['knowledge_documents'] >= 3
+                if (progress['cases'] >= 250 and progress['knowledge_documents'] >= 3
                         and {'PAY-502', 'AUTH-401'}.issubset(codes)
                         and peaks.get('PAY-502', 0) >= 150
                         and peaks.get('AUTH-401', 0) >= 40):
@@ -213,7 +201,37 @@ def launch() -> None:
     except Exception:
         print(f'Demo project {project} remains for inspection. Inspect with: '
               f'docker compose -p {project} ps', flush=True)
+        print(f'Retry this project without deleting its data: '
+              f'python -m backend.demo.local resume {project}', flush=True)
         raise
+
+
+def launch() -> None:
+    subprocess.run(['docker', 'info', '--format', '{{.ServerVersion}}'],
+                   stdout=subprocess.DEVNULL, cwd=ROOT, check=True)
+    suffix = uuid4().hex[:10]
+    project = f'echoguard-local-{suffix}'
+    tenant = f'local-{suffix}'
+    directory = ROOT / 'data' / 'local_demo' / project
+    tokens, registry = credentials(tenant, directory)
+    reserved: set[int] = set()
+    web_port, api_port, kafka_port, mongo_port = (available_port(reserved) for _ in range(4))
+    web_url = f'http://localhost:{web_port}'
+    api_url = f'http://localhost:{api_port}'
+    now = datetime.now(timezone.utc)
+    start = now.replace(minute=(now.minute // 30) * 30, second=0,
+                        microsecond=0) - timedelta(minutes=30)
+    name = f'{project}.jsonl'
+    dataset = ROOT / 'data' / 'scenarios' / name
+    manifest = dataset.with_suffix('.manifest.json')
+    write_scenario(ScenarioConfig(tenant_id=tenant, start_time=start), dataset, manifest)
+    info = {'project': project, 'tenant_id': tenant, 'web_url': web_url,
+            'api_url': api_url, 'dataset': str(dataset.relative_to(ROOT)),
+            'credentials': str((directory / 'credentials.json').relative_to(ROOT)),
+            'kafka_port': kafka_port, 'mongo_port': mongo_port}
+    (directory / 'run.json').write_text(json.dumps(info, indent=2) + '\n')
+    print(f'Starting isolated local demo {project}. Main EchoGuard volumes are untouched.', flush=True)
+    complete_demo(info, tokens, registry)
 
 
 def main() -> None:
@@ -228,6 +246,8 @@ def main() -> None:
     repair.add_argument('project')
     refresh = sub.add_parser('refresh')
     refresh.add_argument('project')
+    resume = sub.add_parser('resume')
+    resume.add_argument('project')
     args = parser.parse_args()
     if args.command == 'start':
         launch()
@@ -236,6 +256,11 @@ def main() -> None:
             parser.error('Only echoguard-local-* projects created by this launcher can be stopped')
         compose(args.project, dict(os.environ), 'down', '-v', '--remove-orphans')
         print(f'Stopped isolated project {args.project}. Local demo files remain under data/local_demo/.')
+    elif args.command == 'resume':
+        run, saved = saved_project(args.project)
+        print(f'Resuming isolated local demo {args.project} with its existing volumes.', flush=True)
+        complete_demo(run, saved['tokens'], registry_for_credentials(run['tenant_id'], saved),
+                      resume=True)
     else:
         run, saved = saved_project(args.project)
         if args.command in {'repair-auth', 'refresh'}:

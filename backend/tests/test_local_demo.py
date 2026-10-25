@@ -132,6 +132,42 @@ def test_refresh_rebuilds_only_api_and_web_with_saved_credentials(tmp_path, monk
     assert json.loads(capsys.readouterr().out)['updated_services'] == ['api', 'web']
 
 
+@pytest.mark.parametrize('receipt_exists', [False, True])
+def test_resume_keeps_project_and_skips_already_published_scenario(
+        tmp_path, monkeypatch, receipt_exists):
+    monkeypatch.setattr(local, 'ROOT', tmp_path)
+    project = 'echoguard-local-0123456789'
+    tenant = 'local-0123456789'
+    directory = tmp_path / 'data/local_demo' / project
+    local.credentials(tenant, directory)
+    scenario = tmp_path / 'data/scenarios' / f'{project}.jsonl'
+    scenario.parent.mkdir(parents=True)
+    scenario.write_text('{}\n')
+    scenario.with_suffix('.manifest.json').write_text('{}\n')
+    if receipt_exists:
+        scenario.with_suffix('.receipt.json').write_text('{}\n')
+    (directory / 'run.json').write_text(json.dumps({
+        'project': project, 'tenant_id': tenant,
+        'web_url': 'http://localhost:32001', 'api_url': 'http://localhost:8201',
+        'dataset': f'data/scenarios/{project}.jsonl',
+        'kafka_port': 9201, 'mongo_port': 27201}))
+    calls = []
+    monkeypatch.setattr(local, 'compose', lambda _name, _env, *args: calls.append(args))
+    monkeypatch.setattr(local, 'incident_list', lambda *_args: [
+        {'_id': 'payment', 'error_code': 'PAY-502', 'peak_count': 150},
+        {'_id': 'login', 'error_code': 'AUTH-401', 'peak_count': 40}])
+    monkeypatch.setattr(local, 'demo_status', lambda *_args: {
+        'cases': 250, 'knowledge_documents': 5})
+    monkeypatch.setattr(local, 'require_authentication', lambda *_args: {})
+    monkeypatch.setattr('sys.argv', ['local', 'resume', project])
+    local.main()
+    assert calls[0][:4] == ('up', '-d', '--build', '--wait')
+    assert any(call[:4] == ('run', '--rm', 'producer', 'verify') for call in calls)
+    assert any(call[:4] == ('run', '--rm', 'producer', 'publish') for call in calls) is not receipt_exists
+    report = json.loads((directory / 'run.json').read_text())
+    assert report['incidents'] == {'PAY-502': 'payment', 'AUTH-401': 'login'}
+
+
 def test_new_local_credentials_use_neutral_actor_ids(tmp_path):
     tenant = 'local-0123456789'
     directory = tmp_path / 'workspace'
